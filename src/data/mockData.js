@@ -1,7 +1,7 @@
 export const initialCompanies = [
-  { id: 1, name: "B&M", systemName: "B&M Insumos e Implementos", active: true },
-  { id: 2, name: "Dayantti", systemName: "Dayantti Suplementos", active: true },
-  { id: 3, name: "Bio Folium", systemName: "Bio Folium", active: true }
+  { id: 1, name: "1-Bem", systemName: "Bem industrias de Sementes LTDA", active: true },
+  { id: 2, name: "61-Davantti", systemName: "Davantti Implementos LTDA", active: true },
+  { id: 3, name: "51-Biofolium", systemName: "Biofolium Fertilizantes LTDA", active: true }
 ];
 
 export const initialCostCenters = [
@@ -17,9 +17,9 @@ export const initialAccounts = [
 ];
 
 export const systemCompanies = [
-  "B&M Insumos e Implementos",
-  "Dayantti Suplementos",
-  "Bio Folium",
+  "Bem industrias de Sementes LTDA",
+  "Davantti Implementos LTDA",
+  "Biofolium Fertilizantes LTDA",
   "Akrus Matriz",
   "Akrus Filial Brasília"
 ];

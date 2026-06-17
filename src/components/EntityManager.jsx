@@ -91,8 +91,6 @@ export default function EntityManager({
         eyebrow={eyebrow}
         title={title}
         description={description}
-        actionLabel={addLabel}
-        onAction={openCreateForm}
       />
 
       <section className="app-panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -102,7 +100,7 @@ export default function EntityManager({
           onChange={(event) => setSearch(event.target.value)}
           placeholder={`Buscar ${title.toLowerCase()}`}
         />
-        <Button variant="secondary" onClick={openCreateForm}>
+        <Button onClick={openCreateForm}>
           {addLabel}
         </Button>
       </section>
