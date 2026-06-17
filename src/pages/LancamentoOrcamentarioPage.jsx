@@ -24,13 +24,12 @@ const accountDescriptions = {
   203: "Use para consumo de energia elétrica e despesas diretamente ligadas à conta de luz."
 };
 
-export default function LancamentoOrcamentarioPage() {
+export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunchedBudgets }) {
   const [selectedCompany, setSelectedCompany] = useState(initialCompanies[0]);
   const [selectedCr, setSelectedCr] = useState(initialCostCenters[0]);
   const [selectedAccount, setSelectedAccount] = useState(initialAccounts[0]);
   const [total, setTotal] = useState("120000,00");
   const [monthlyValues, setMonthlyValues] = useState(() => distributeEvenly(120000));
-  const [launchedBudgets, setLaunchedBudgets] = useState([]);
   const [launchFeedback, setLaunchFeedback] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedGridCompany, setSelectedGridCompany] = useState(null);
@@ -675,6 +674,7 @@ function BudgetCard({ budget, expanded, onToggle, onEditBudget }) {
         onClick={onToggle}
       >
         <div>
+          <span className="mb-1 block text-xs font-bold text-slate-500">Lançado por Carlos André</span>
           <span className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Centro de resultado</span>
           <strong className="block text-sm text-akrus-900">
             {budget.cr.code} - {budget.cr.name}

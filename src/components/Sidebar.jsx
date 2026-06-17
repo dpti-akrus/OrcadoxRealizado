@@ -1,13 +1,17 @@
-import { Building2, Calculator, Landmark, Network } from "lucide-react";
+import { Building2, Calculator, ClipboardCheck, Landmark, Network, Users } from "lucide-react";
 
 const menuItems = [
   { id: "lancamento", label: "Orçamento", icon: Calculator },
-  { id: "empresas", label: "Empresas", icon: Building2 },
-  { id: "centros", label: "Centro de resultado", icon: Network },
-  { id: "contas", label: "Contas Contábeis", icon: Landmark }
+  { id: "realizado", label: "Realizado", icon: ClipboardCheck },
+  { id: "empresas", label: "Empresas", icon: Building2, restricted: true },
+  { id: "centros", label: "Centro de resultado", icon: Network, restricted: true },
+  { id: "contas", label: "Contas Contábeis", icon: Landmark, restricted: true },
+  { id: "usuarios", label: "Usuários", icon: Users, restricted: true }
 ];
 
-export default function Sidebar({ currentPage, onChangePage }) {
+export default function Sidebar({ currentPage, onChangePage, canViewRestrictedPages = false }) {
+  const visibleMenuItems = menuItems.filter((item) => !item.restricted || canViewRestrictedPages);
+
   return (
     <aside className="bg-akrus px-5 py-6 text-white lg:sticky lg:top-0 lg:h-screen">
       <div className="mb-8 flex items-center">
@@ -15,7 +19,7 @@ export default function Sidebar({ currentPage, onChangePage }) {
       </div>
 
       <nav className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const active = currentPage === item.id;
           const Icon = item.icon;
 

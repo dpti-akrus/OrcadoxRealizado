@@ -16,6 +16,12 @@ export const initialAccounts = [
   { id: 203, code: "3.03.08", name: "Energia", systemName: "3.03.08 - Energia Elétrica", active: true }
 ];
 
+export const initialUsers = [
+  { id: 301, code: "282", systemUserName: "Carlos A", name: "Carlos André", role: "Gestor administrativo", type: "Administrador", active: true },
+  { id: 302, code: "347", systemUserName: "Ana Paula", name: "Ana Paula", role: "Controladoria", type: "Normal", active: true },
+  { id: 303, code: "419", systemUserName: "Marcos S", name: "Marcos Silva", role: "Operações", type: "Normal", active: true }
+];
+
 export const systemCompanies = [
   "Bem industrias de Sementes LTDA",
   "Davantti Implementos LTDA",
@@ -38,6 +44,14 @@ export const systemAccounts = [
   "3.02.04 - Manutenção Predial",
   "3.03.08 - Energia Elétrica",
   "3.04.11 - Serviços de Terceiros"
+];
+
+export const systemUsers = [
+  { code: "282", name: "Carlos A" },
+  { code: "347", name: "Ana Paula" },
+  { code: "419", name: "Marcos S" },
+  { code: "501", name: "Juliana Costa" },
+  { code: "612", name: "Roberto Lima" }
 ];
 
 export const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];

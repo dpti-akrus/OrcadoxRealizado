@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import Button from "./Button.jsx";
 
 export default function EntityForm({
@@ -33,13 +34,16 @@ export default function EntityForm({
       <div className="grid gap-4 lg:grid-cols-2">
         <label className="grid gap-2">
           <span className="form-label">{searchLabel}</span>
-          <input
-            className="form-input"
-            value={form.systemName}
-            onChange={(event) => onChange({ ...form, systemName: event.target.value })}
-            placeholder={searchPlaceholder}
-            list="system-options"
-          />
+          <span className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" strokeWidth={2.2} />
+            <input
+              className="form-input pl-10"
+              value={form.systemName}
+              onChange={(event) => onChange({ ...form, systemName: event.target.value })}
+              placeholder={searchPlaceholder}
+              list="system-options"
+            />
+          </span>
           <datalist id="system-options">
             {filteredSuggestions.map((item) => (
               <option value={item} key={item} />

@@ -4,7 +4,7 @@ export default function EntityCard({ item, onEdit, onToggle }) {
   const label = item.code ? `${item.code} - ${item.name}` : item.name;
 
   return (
-    <article className={`relative grid min-h-44 place-items-center gap-3 rounded-lg border border-slate-200 bg-white p-5 text-center transition hover:-translate-y-1 hover:border-akrus/40 hover:shadow-panel ${item.active ? "" : "opacity-55 grayscale"}`}>
+    <article className={`relative grid min-h-44 place-items-center gap-3 rounded-lg border border-slate-200 bg-white p-5 text-center transition hover:border-akrus/25 hover:bg-slate-50 ${item.active ? "" : "opacity-55 grayscale"}`}>
       <span className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-xs font-extrabold ${item.active ? "bg-akrus-50 text-akrus" : "bg-red-50 text-red-600"}`}>
         {item.active ? "Ativo" : "Inativo"}
       </span>
