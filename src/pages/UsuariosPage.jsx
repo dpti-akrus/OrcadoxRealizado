@@ -1,43 +1,68 @@
-import { useMemo, useState } from "react";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Pencil, Search } from "lucide-react";
 import Button from "../components/Button.jsx";
 import PageHeader from "../components/PageHeader.jsx";
-import { initialCostCenters, initialUsers, systemUsers } from "../data/mockData.js";
+import { buscarUsuarioSistemaPorCodigo, buscarUsuarios, salvarUsuario } from "../services/usuarioService.js";
 
-const emptyUser = { code: "", systemUserName: "", name: "", role: "", type: "Normal", costCenterIds: [] };
+const emptyUser = { code: "", systemUserName: "", name: "", role: "", type: "Normal" };
+const typeFromDatabase = { A: "Administrador", N: "Normal", D: "Administrativo" };
+const typeToDatabase = { Administrador: "A", Normal: "N", Administrativo: "D" };
+
+function mapUser(user) {
+  return {
+    id: user.IDORCUSU,
+    code: String(user.CODUSU ?? ""),
+    systemUserName: "",
+    name: user.NOMEAPP || "",
+    role: user.CARGO || "",
+    type: typeFromDatabase[user.TIPOUSU] || "Normal",
+    active: user.ATIVO === "S"
+  };
+}
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(emptyUser);
-  const [selectedCostCenterId, setSelectedCostCenterId] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingSystemUser, setLoadingSystemUser] = useState(false);
+  const [savingUser, setSavingUser] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const filteredUsers = useMemo(() => {
-    const term = search.trim().toLowerCase();
+  useEffect(() => {
+    let active = true;
 
-    if (!term) {
-      return users;
+    async function loadUsers() {
+      try {
+        setLoadingUsers(true);
+        const result = await buscarUsuarios();
+        if (active) setUsers(result.dados.map(mapUser));
+      } catch (error) {
+        console.error("Erro ao carregar usuários:", error);
+        if (active) setMessage(error.message);
+      } finally {
+        if (active) setLoadingUsers(false);
+      }
     }
 
-    return users.filter((user) => [user.name, user.role].some((value) => value.toLowerCase().includes(term)));
+    loadUsers();
+    return () => { active = false; };
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return users;
+    return users.filter((user) =>
+      [user.code, user.name, user.role].some((value) => String(value).toLocaleLowerCase("pt-BR").includes(term))
+    );
   }, [users, search]);
-
-  const linkedCostCenters = useMemo(
-    () => initialCostCenters.filter((costCenter) => form.costCenterIds.includes(costCenter.id)),
-    [form.costCenterIds]
-  );
-
-  const availableCostCenters = useMemo(
-    () => initialCostCenters.filter((costCenter) => !form.costCenterIds.includes(costCenter.id)),
-    [form.costCenterIds]
-  );
 
   function openCreateForm() {
     setEditingUser(null);
     setForm(emptyUser);
-    setSelectedCostCenterId("");
+    setMessage("");
     setFormOpen(true);
   }
 
@@ -47,90 +72,87 @@ export default function UsuariosPage() {
       code: user.code,
       systemUserName: user.systemUserName,
       name: user.name,
-      role: user.role || "",
-      type: user.type || "Normal",
-      costCenterIds: user.costCenterIds || []
+      role: user.role,
+      type: user.type
     });
-    setSelectedCostCenterId("");
+    setMessage("");
     setFormOpen(true);
   }
 
   function handleSystemCodeChange(value) {
-    const systemUser = systemUsers.find((user) => user.code === value.trim());
+    if (!/^\d*$/.test(value)) return;
+    setForm((current) => ({ ...current, code: value, systemUserName: "" }));
+    setMessage("");
+  }
 
-    setForm((current) => ({
-      ...current,
-      code: value,
-      systemUserName: systemUser ? systemUser.name : ""
-    }));
+  async function searchSystemUser() {
+    if (!form.code.trim()) {
+      setMessage("Informe o código ERP do usuário.");
+      return;
+    }
+
+    try {
+      setLoadingSystemUser(true);
+      setMessage("");
+      const user = await buscarUsuarioSistemaPorCodigo(form.code);
+
+      if (!user) {
+        setForm((current) => ({ ...current, systemUserName: "" }));
+        setMessage("Usuário não encontrado na TSIUSU.");
+        return;
+      }
+
+      setForm((current) => ({
+        ...current,
+        code: String(user.codigo),
+        systemUserName: user.nome,
+        name: current.name || user.nome
+      }));
+    } catch (error) {
+      console.error("Erro ao buscar usuário no Sankhya:", error);
+      setMessage(error.message);
+    } finally {
+      setLoadingSystemUser(false);
+    }
   }
 
   function closeForm() {
     setFormOpen(false);
     setEditingUser(null);
     setForm(emptyUser);
-    setSelectedCostCenterId("");
+    setMessage("");
   }
 
-  function addCostCenterLink() {
-    const nextCostCenterId = Number(selectedCostCenterId || availableCostCenters[0]?.id);
-
-    if (!nextCostCenterId || form.costCenterIds.includes(nextCostCenterId)) {
+  async function saveUser() {
+    if (!editingUser && !form.systemUserName) {
+      setMessage("Busque e valide o usuário na TSIUSU antes de finalizar o cadastro.");
+      return;
+    }
+    if (!form.name.trim()) {
+      setMessage("Informe o nome que será exibido no aplicativo.");
       return;
     }
 
-    setForm((current) => ({
-      ...current,
-      costCenterIds: [...current.costCenterIds, nextCostCenterId]
-    }));
-    setSelectedCostCenterId("");
-  }
-
-  function removeCostCenterLink(costCenterId) {
-    setForm((current) => ({
-      ...current,
-      costCenterIds: current.costCenterIds.filter((linkedCostCenterId) => linkedCostCenterId !== costCenterId)
-    }));
-  }
-
-  function saveUser() {
-    if (!form.code.trim() || !form.systemUserName.trim() || !form.name.trim() || !form.role.trim()) {
-      return;
+    try {
+      setSavingUser(true);
+      setMessage("");
+      await salvarUsuario({
+        CODUSU: Number(form.code),
+        IDORCUSU: editingUser?.id,
+        NOMEAPP: form.name,
+        CARGO: form.role,
+        TIPOUSU: typeToDatabase[form.type],
+        ATIVO: editingUser?.active === false ? "N" : "S"
+      });
+      const result = await buscarUsuarios();
+      setUsers(result.dados.map(mapUser));
+      closeForm();
+    } catch (error) {
+      console.error("Erro ao salvar usuário:", error);
+      setMessage(error.message);
+    } finally {
+      setSavingUser(false);
     }
-
-    if (editingUser) {
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === editingUser.id
-            ? {
-                ...user,
-                code: form.code.trim(),
-                systemUserName: form.systemUserName.trim(),
-                name: form.name.trim(),
-                role: form.role.trim(),
-                type: form.type,
-                costCenterIds: form.costCenterIds
-              }
-            : user
-        )
-      );
-    } else {
-      setUsers((current) => [
-        ...current,
-        {
-          id: Date.now(),
-          code: form.code.trim(),
-          systemUserName: form.systemUserName.trim(),
-          name: form.name.trim(),
-          role: form.role.trim(),
-          type: form.type,
-          costCenterIds: form.costCenterIds,
-          active: true
-        }
-      ]);
-    }
-
-    closeForm();
   }
 
   if (formOpen) {
@@ -139,7 +161,7 @@ export default function UsuariosPage() {
         <PageHeader
           eyebrow="Cadastros"
           title={editingUser ? "Editar usuário" : "Adicionar usuário"}
-          description="Confira os dados do ERP e defina nome e cargo exibidos no app."
+          description="Consulte o usuário do ERP pelo código e confira o nome retornado pela TSIUSU."
         />
 
         <section className="app-panel grid gap-4 p-5">
@@ -147,131 +169,73 @@ export default function UsuariosPage() {
             <label className="grid gap-2">
               <span className="form-label">Código ERP</span>
               <span className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" strokeWidth={2.2} />
+                <button
+                  className="absolute left-2 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-akrus disabled:opacity-50"
+                  type="button"
+                  onClick={searchSystemUser}
+                  disabled={loadingSystemUser || Boolean(editingUser)}
+                  aria-label="Buscar usuário no Sankhya"
+                  title="Buscar usuário no Sankhya"
+                >
+                  <Search className="h-4 w-4" strokeWidth={2.2} />
+                </button>
                 <input
-                  className="form-input pl-10"
+                  className="form-input pl-11"
                   value={form.code}
                   onChange={(event) => handleSystemCodeChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      searchSystemUser();
+                    }
+                  }}
                   placeholder="Ex: 282"
-                  list="system-user-codes"
+                  inputMode="numeric"
+                  type="number"
+                  min="0"
+                  step="1"
                   readOnly={Boolean(editingUser)}
                 />
               </span>
-              <datalist id="system-user-codes">
-                {systemUsers.map((user) => (
-                  <option value={user.code} key={user.code}>
-                    {user.name}
-                  </option>
-                ))}
-              </datalist>
             </label>
 
             <label className="grid gap-2">
               <span className="form-label">Nome ERP</span>
-              <input className="form-input" value={form.systemUserName} readOnly placeholder="Selecione um código" />
+              <input
+                className="form-input"
+                value={loadingSystemUser ? "Buscando usuário..." : form.systemUserName}
+                readOnly
+                placeholder="Clique na lupa ou pressione Enter"
+              />
             </label>
           </div>
+
+          {message && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">{message}</p>}
 
           <div className="grid gap-4 lg:grid-cols-3">
             <label className="grid gap-2">
               <span className="form-label">Nome no app</span>
-              <input
-                className="form-input"
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Ex: Carlos André"
-              />
+              <input className="form-input" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
             </label>
-
             <label className="grid gap-2">
               <span className="form-label">Cargo</span>
-              <input
-                className="form-input"
-                value={form.role}
-                onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}
-                placeholder="Ex: Gestor administrativo"
-              />
+              <input className="form-input" value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))} />
             </label>
-
             <label className="grid gap-2">
               <span className="form-label">Tipo</span>
-              <select
-                className="form-input"
-                value={form.type}
-                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-              >
-                <option value="Normal">Normal</option>
+              <select className="form-input" value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}>
                 <option value="Administrador">Administrador</option>
+                <option value="Normal">Normal</option>
+                <option value="Administrativo">Administrativo</option>
               </select>
             </label>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <span className="form-label">Centros de resultado vinculados</span>
-                <p className="mt-1 text-sm text-slate-500">Selecione os centros que este usuário poderá acessar.</p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:min-w-[360px] sm:flex-row">
-                <select
-                  className="form-input"
-                  value={selectedCostCenterId}
-                  onChange={(event) => setSelectedCostCenterId(event.target.value)}
-                  disabled={availableCostCenters.length === 0}
-                >
-                  <option value="">
-                    {availableCostCenters.length === 0 ? "Todos os centros vinculados" : "Selecionar centro"}
-                  </option>
-                  {availableCostCenters.map((costCenter) => (
-                    <option value={costCenter.id} key={costCenter.id}>
-                      {costCenter.code} - {costCenter.name}
-                    </option>
-                  ))}
-                </select>
-                <Button type="button" onClick={addCostCenterLink} disabled={availableCostCenters.length === 0}>
-                  Vincular
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2">
-              {linkedCostCenters.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-400">
-                  Nenhum centro vinculado ainda.
-                </div>
-              ) : (
-                linkedCostCenters.map((costCenter) => (
-                  <div
-                    className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    key={costCenter.id}
-                  >
-                    <div>
-                      <strong className="text-sm text-akrus-900">
-                        {costCenter.code} - {costCenter.name}
-                      </strong>
-                      <p className="text-xs font-semibold text-slate-400">{costCenter.systemName}</p>
-                    </div>
-                    <button
-                      className="inline-grid h-9 w-9 place-items-center rounded-lg border border-red-100 bg-white text-red-600 transition hover:bg-red-50"
-                      type="button"
-                      onClick={() => removeCostCenterLink(costCenter.id)}
-                      aria-label={`Remover centro ${costCenter.name}`}
-                      title="Remover vínculo"
-                    >
-                      <Trash2 className="h-4 w-4" strokeWidth={2.2} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={closeForm}>
-              Voltar
+            <Button variant="secondary" onClick={closeForm} disabled={savingUser}>Voltar</Button>
+            <Button onClick={saveUser} disabled={savingUser || loadingSystemUser}>
+              {savingUser ? "Salvando..." : editingUser ? "Salvar alterações" : "Finalizar cadastro"}
             </Button>
-            <Button onClick={saveUser}>{editingUser ? "Salvar alterações" : "Adicionar usuário"}</Button>
           </div>
         </section>
       </div>
@@ -280,46 +244,28 @@ export default function UsuariosPage() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Cadastros"
-        title="Usuários"
-        description="Gerencie nome e cargo dos usuários que usam a plataforma."
-      />
-
+      <PageHeader eyebrow="Cadastros" title="Usuários" description="Gerencie os usuários que possuem acesso à plataforma." />
       <section className="app-panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <input
-          className="form-input sm:max-w-sm"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por nome ou cargo"
-        />
+        <input className="form-input sm:max-w-sm" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por código, nome ou cargo" />
         <Button onClick={openCreateForm}>+ Adicionar usuário</Button>
       </section>
 
+      {message && !formOpen && <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">{message}</p>}
+
       <section className="app-panel overflow-hidden">
-        <div className="grid grid-cols-[1fr_1fr_80px] bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-400">
-          <span>Nome</span>
-          <span>Cargo</span>
-          <span className="text-right">Editar</span>
+        <div className="grid grid-cols-[100px_1fr_1fr_80px] bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-400">
+          <span>Código</span><span>Nome</span><span>Cargo</span><span className="text-right">Editar</span>
         </div>
 
-        {filteredUsers.map((user) => (
-          <div
-            key={user.id}
-            className="grid grid-cols-[1fr_1fr_80px] items-center border-t border-slate-200 px-4 py-3 text-sm transition hover:bg-slate-50"
-            onDoubleClick={() => openEditForm(user)}
-            title="Clique duas vezes para editar"
-          >
+        {loadingUsers && <p className="border-t border-slate-200 px-4 py-6 text-center text-sm text-slate-500">Carregando usuários...</p>}
+        {!loadingUsers && filteredUsers.length === 0 && <p className="border-t border-slate-200 px-4 py-6 text-center text-sm text-slate-500">Nenhum usuário cadastrado.</p>}
+        {!loadingUsers && filteredUsers.map((user) => (
+          <div key={user.id} className="grid grid-cols-[100px_1fr_1fr_80px] items-center border-t border-slate-200 px-4 py-3 text-sm transition hover:bg-slate-50">
+            <span className="font-bold text-slate-500">{user.code}</span>
             <strong className="text-akrus-900">{user.name}</strong>
             <span className="text-slate-600">{user.role}</span>
             <span className="text-right">
-              <button
-                className="inline-grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-akrus transition hover:border-akrus/25 hover:bg-slate-50"
-                type="button"
-                onClick={() => openEditForm(user)}
-                aria-label={`Editar usuário ${user.name}`}
-                title="Editar usuário"
-              >
+              <button className="inline-grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-akrus" type="button" onClick={() => openEditForm(user)} aria-label={`Editar usuário ${user.name}`}>
                 <Pencil className="h-4 w-4" strokeWidth={2.2} />
               </button>
             </span>

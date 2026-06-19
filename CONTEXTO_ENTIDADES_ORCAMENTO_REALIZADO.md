@@ -27,7 +27,7 @@ Campos identificados:
 
 | Campo | Descrição | Tipo |
 |---|---|---|
-| `CODCCO` | Código | Número Inteiro |
+| `CODCCO` | Código | Número Inteiro | incremental 
 | `CODEMP` | Empresa | Número Inteiro |
 | `CODCTACTB` | Conta Contábil | Número Inteiro |
 | `CODPROJ` | Projeto | Número Inteiro |
