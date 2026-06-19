@@ -1,14 +1,18 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, Pencil } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { CheckCircle2, ChevronRight, HelpCircle, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
 import Button from "../components/Button.jsx";
 import PageHeader from "../components/PageHeader.jsx";
-import { initialAccounts, initialCompanies, initialCostCenters, months } from "../data/mockData.js";
+import PeriodFilter from "../components/PeriodFilter.jsx";
+import { initialAccounts, initialCompanies, initialCompanyGroups, initialCostCenters, months } from "../data/mockData.js";
+import { fullYearPeriod, getMonthIndexes, getPeriodLabel, sumValuesInPeriod } from "../utils/monthPeriod.js";
 
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL"
 });
+
+const helpPdfUrl = `${import.meta.env.BASE_URL}manual-orcamento.pdf`;
 
 const parseMoney = (value) => Number(String(value || "0").replace(/\./g, "").replace(",", ".")) || 0;
 
@@ -29,19 +33,26 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   const [selectedCr, setSelectedCr] = useState(initialCostCenters[0]);
   const [selectedAccount, setSelectedAccount] = useState(initialAccounts[0]);
   const [total, setTotal] = useState("120000,00");
+  const [isTotalCalculatedFromMonths, setIsTotalCalculatedFromMonths] = useState(false);
   const [monthlyValues, setMonthlyValues] = useState(() => distributeEvenly(120000));
   const [launchFeedback, setLaunchFeedback] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedCompanyGroup, setSelectedCompanyGroup] = useState(null);
   const [selectedGridCompany, setSelectedGridCompany] = useState(null);
   const [expandedCrId, setExpandedCrId] = useState(null);
   const [launchStep, setLaunchStep] = useState(0);
   const [crSearch, setCrSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [showRepeatPrompt, setShowRepeatPrompt] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [helpPdfStatus, setHelpPdfStatus] = useState("idle");
   const [budgetToDelete, setBudgetToDelete] = useState(null);
   const [editingBudget, setEditingBudget] = useState(null);
+  const [period, setPeriod] = useState(fullYearPeriod);
 
   const totalNumber = parseMoney(total);
+  const monthIndexes = getMonthIndexes(period);
+  const periodLabel = getPeriodLabel(period);
   const allocated = useMemo(
     () => monthlyValues.reduce((sum, value) => sum + parseMoney(value), 0),
     [monthlyValues]
@@ -51,15 +62,31 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   const canLaunch = closed && totalNumber > 0;
   const companySummaries = useMemo(
     () =>
-      initialCompanies.map((company) => {
-        const companyBudgets = launchedBudgets.filter((budget) => budget.company.id === company.id);
+      initialCompanies
+        .filter((company) => !selectedCompanyGroup || company.groupId === selectedCompanyGroup.id)
+        .map((company) => {
+          const companyBudgets = launchedBudgets.filter((budget) => budget.company.id === company.id);
+
+          return {
+            company,
+            value: companyBudgets.reduce((sum, budget) => sum + sumValuesInPeriod(budget.monthlyValues, period), 0)
+          };
+        }),
+    [launchedBudgets, period, selectedCompanyGroup]
+  );
+  const companyGroupSummaries = useMemo(
+    () =>
+      initialCompanyGroups.map((group) => {
+        const companyIds = new Set(initialCompanies.filter((company) => company.groupId === group.id).map((company) => company.id));
+        const groupBudgets = launchedBudgets.filter((budget) => companyIds.has(budget.company.id));
 
         return {
-          company,
-          value: companyBudgets.reduce((sum, budget) => sum + budget.value, 0)
+          group,
+          companiesCount: companyIds.size,
+          value: groupBudgets.reduce((sum, budget) => sum + sumValuesInPeriod(budget.monthlyValues, period), 0)
         };
       }),
-    [launchedBudgets]
+    [launchedBudgets, period]
   );
   const groupedBudgets = useMemo(() => {
     const groups = new Map();
@@ -73,13 +100,15 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
           value: 0
         };
 
-        current.items.push(budget);
-        current.value += budget.value;
+        const periodValue = sumValuesInPeriod(budget.monthlyValues, period);
+
+        current.items.push({ ...budget, periodValue });
+        current.value += periodValue;
         groups.set(budget.cr.id, current);
       });
 
     return Array.from(groups.values());
-  }, [launchedBudgets, selectedGridCompany]);
+  }, [launchedBudgets, period, selectedGridCompany]);
   const selectedCompanyBudgets = useMemo(
     () => launchedBudgets.filter((budget) => selectedGridCompany && budget.company.id === selectedGridCompany.id),
     [launchedBudgets, selectedGridCompany]
@@ -112,7 +141,43 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   }
 
   function updateMonth(index, value) {
-    setMonthlyValues((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)));
+    setMonthlyValues((current) => {
+      const nextValues = current.map((item, itemIndex) => (itemIndex === index ? value : item));
+
+      if (isTotalCalculatedFromMonths || !total.trim()) {
+        const nextTotal = nextValues.reduce((sum, item) => sum + parseMoney(item), 0);
+        setTotal(formatInputMoney(nextTotal));
+        setIsTotalCalculatedFromMonths(true);
+      }
+
+      return nextValues;
+    });
+  }
+
+  function handleTotalChange(value) {
+    setTotal(value);
+    setIsTotalCalculatedFromMonths(!value.trim());
+  }
+
+  function handleClearMonths() {
+    setMonthlyValues(Array(12).fill("0,00"));
+
+    if (isTotalCalculatedFromMonths) {
+      setTotal("0,00");
+    }
+  }
+
+  async function handleOpenHelp() {
+    setShowHelp(true);
+    setHelpPdfStatus("loading");
+
+    try {
+      const response = await fetch(helpPdfUrl, { method: "HEAD", cache: "no-store" });
+      const contentType = response.headers.get("content-type") || "";
+      setHelpPdfStatus(response.ok && contentType.includes("pdf") ? "available" : "missing");
+    } catch {
+      setHelpPdfStatus("missing");
+    }
   }
 
   function handleDistribute() {
@@ -189,7 +254,20 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
     setExpandedCrId(null);
   }
 
+  function handleSelectCompanyGroup(group) {
+    setSelectedCompanyGroup(group);
+    setSelectedGridCompany(null);
+    setExpandedCrId(null);
+  }
+
   function handleBackToCompanies() {
+    setSelectedGridCompany(null);
+    setExpandedCrId(null);
+    setLaunchFeedback("");
+  }
+
+  function handleBackToCompanyGroups() {
+    setSelectedCompanyGroup(null);
     setSelectedGridCompany(null);
     setExpandedCrId(null);
     setLaunchFeedback("");
@@ -209,6 +287,7 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   function resetEntryValues() {
     setSelectedAccount(initialAccounts[0]);
     setTotal("120000,00");
+    setIsTotalCalculatedFromMonths(false);
     setMonthlyValues(distributeEvenly(120000));
     setAccountSearch("");
     setLaunchFeedback("");
@@ -227,11 +306,13 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   }
 
   function handleEditBudget(budget) {
+    setSelectedCompanyGroup(initialCompanyGroups.find((group) => group.id === budget.company.groupId) || null);
     setSelectedCompany(budget.company);
     setSelectedGridCompany(budget.company);
     setSelectedCr(budget.cr);
     setSelectedAccount(budget.account);
     setTotal(formatInputMoney(budget.value));
+    setIsTotalCalculatedFromMonths(false);
     setMonthlyValues(budget.monthlyValues.map(formatInputMoney));
     setEditingBudget(budget);
     setShowRepeatPrompt(false);
@@ -249,7 +330,8 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
       Empresa: budget.company.name,
       Centro: `${budget.cr.code} - ${budget.cr.name}`,
       Conta: `${budget.account.code} - ${budget.account.name}`,
-      Valor: budget.value
+      Período: periodLabel,
+      Valor: sumValuesInPeriod(budget.monthlyValues, period)
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
@@ -278,14 +360,37 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
       <PageHeader
         eyebrow="Gestão orçamentária"
         title="Orçamento"
-        description="Selecione uma empresa para visualizar e lançar orçamentos por centro de resultado."
+        description="Selecione um grupo, escolha a empresa e visualize os orçamentos por centro de resultado."
       />
 
-      {!isFormOpen && !selectedGridCompany && (
+      {!isFormOpen && <PeriodFilter period={period} onApply={setPeriod} />}
+
+      {!isFormOpen && !selectedCompanyGroup && !selectedGridCompany && (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {companySummaries.map((summary) => (
-            <CompanyCard key={summary.company.id} summary={summary} onClick={() => handleSelectCompany(summary.company)} />
+          {companyGroupSummaries.map((summary) => (
+            <CompanyGroupCard key={summary.group.id} summary={summary} periodLabel={periodLabel} onClick={() => handleSelectCompanyGroup(summary.group)} />
           ))}
+        </section>
+      )}
+
+      {!isFormOpen && selectedCompanyGroup && !selectedGridCompany && (
+        <section className="grid gap-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Grupo empresarial</span>
+              <h2 className="text-xl font-extrabold text-akrus-900">{selectedCompanyGroup.name}</h2>
+              <p className="text-sm text-slate-500">Selecione uma empresa para acessar os centros de resultado.</p>
+            </div>
+            <Button variant="secondary" onClick={handleBackToCompanyGroups}>
+              Voltar para grupos
+            </Button>
+          </div>
+
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {companySummaries.map((summary) => (
+              <CompanyCard key={summary.company.id} summary={summary} periodLabel={periodLabel} onClick={() => handleSelectCompany(summary.company)} />
+            ))}
+          </section>
         </section>
       )}
 
@@ -293,15 +398,18 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
         <section className="mb-5 grid gap-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-extrabold text-akrus-900">{selectedGridCompany.name}</h2>
-              <p className="text-sm text-slate-500">Orçamentos agrupados por centro de resultado.</p>
+              <h2 className="text-lg font-extrabold text-akrus-900">
+                {selectedGridCompany.code} - {selectedGridCompany.name}
+              </h2>
+              <p className="text-sm text-slate-500">{selectedCompanyGroup?.name} / Empresa / Centros de resultado</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-sm font-bold text-akrus">{groupedBudgets.length} grupo(s)</span>
               <Button variant="secondary" onClick={handleBackToCompanies}>
-                Voltar para empresas
+                Voltar para empresas de {selectedCompanyGroup?.name}
               </Button>
               <Button onClick={handleExportBudgets}>Exportar</Button>
+              <Button onClick={handleOpenForm}>+ Adicionar lançamento</Button>
             </div>
           </div>
 
@@ -313,6 +421,8 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
                 expanded={expandedCrId === budget.cr.id}
                 onToggle={() => setExpandedCrId((current) => (current === budget.cr.id ? null : budget.cr.id))}
                 onEditBudget={handleEditBudget}
+                monthIndexes={monthIndexes}
+                periodLabel={periodLabel}
               />
             ))}
           </div>
@@ -322,11 +432,16 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
       {!isFormOpen && selectedGridCompany && groupedBudgets.length === 0 && (
         <section className="app-panel grid min-h-[260px] place-items-center p-8 text-center">
           <div>
-            <h2 className="text-xl font-extrabold text-akrus-900">Nenhum orçamento lançado para {selectedGridCompany.name}</h2>
+            <h2 className="text-xl font-extrabold text-akrus-900">
+              Nenhum orçamento lançado para {selectedGridCompany.code} - {selectedGridCompany.name}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">Use o botão + para adicionar o primeiro lançamento dessa empresa.</p>
-            <Button className="mt-5" variant="secondary" onClick={handleBackToCompanies}>
-              Voltar para empresas
-            </Button>
+            <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={handleBackToCompanies}>
+                Voltar para empresas de {selectedCompanyGroup?.name}
+              </Button>
+              <Button onClick={handleOpenForm}>+ Adicionar lançamento</Button>
+            </div>
           </div>
         </section>
       )}
@@ -458,7 +573,7 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
 
                   <label className="grid gap-2">
                     <span className="form-label">Valor total</span>
-                    <input className="form-input" value={total} onChange={(event) => setTotal(event.target.value)} />
+                    <input className="form-input" value={total} onChange={(event) => handleTotalChange(event.target.value)} />
                   </label>
 
                   <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
@@ -478,7 +593,7 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
                 <section className="min-w-0">
                   <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="text-lg font-extrabold text-akrus-900">Meses do orçamento</h3>
-                    <Button variant="ghost" onClick={() => setMonthlyValues(Array(12).fill("0,00"))}>
+                    <Button variant="ghost" onClick={handleClearMonths}>
                       Zerar meses
                     </Button>
                   </div>
@@ -541,16 +656,60 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
         </section>
       )}
 
-      {!isFormOpen && selectedGridCompany && (
-        <button
-          className="fixed bottom-6 right-6 grid h-14 w-14 place-items-center rounded-full bg-akrus text-3xl font-bold leading-none text-white shadow-[0_10px_24px_rgba(23,63,98,0.2)] transition hover:bg-akrus-800 focus:outline-none focus:ring-4 focus:ring-akrus/20"
-          type="button"
-          onClick={handleOpenForm}
-          aria-label="Adicionar novo lançamento"
-          title="Adicionar novo lançamento"
-        >
-          +
-        </button>
+      <button
+        className="fixed bottom-6 right-6 z-40 grid h-14 w-14 place-items-center rounded-full bg-akrus text-white shadow-[0_12px_28px_rgba(23,63,98,0.3)] transition hover:-translate-y-0.5 hover:bg-akrus-800 focus:outline-none focus:ring-4 focus:ring-akrus/20"
+        type="button"
+        onClick={handleOpenHelp}
+        aria-label="Ajuda"
+        title="Ajuda"
+      >
+        <HelpCircle className="h-7 w-7" strokeWidth={2.4} />
+      </button>
+
+      {showHelp && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-3 sm:p-5">
+          <section className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl bg-white shadow-[0_22px_65px_rgba(15,43,68,0.3)]">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-akrus-50 text-akrus">
+                  <HelpCircle className="h-5 w-5" strokeWidth={2.3} />
+                </span>
+                <div>
+                  <h2 className="text-lg font-extrabold text-akrus-900">Manual de ajuda</h2>
+                  <p className="text-xs text-slate-500">manual-orcamento.pdf</p>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={() => setShowHelp(false)}>Voltar</Button>
+            </div>
+
+            <div className="min-h-0 flex-1 bg-slate-100 p-3 sm:p-4">
+              {helpPdfStatus === "available" && (
+                <iframe className="h-full w-full rounded-lg border border-slate-200 bg-white" src={helpPdfUrl} title="Manual de ajuda do orçamento" />
+              )}
+
+              {helpPdfStatus === "loading" && (
+                <div className="grid h-full place-items-center rounded-lg border border-slate-200 bg-white text-center">
+                  <div>
+                    <strong className="text-akrus-900">Carregando manual...</strong>
+                    <p className="mt-1 text-sm text-slate-500">Aguarde enquanto o PDF é localizado.</p>
+                  </div>
+                </div>
+              )}
+
+              {helpPdfStatus === "missing" && (
+                <div className="grid h-full place-items-center rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center">
+                  <div>
+                    <HelpCircle className="mx-auto h-10 w-10 text-slate-300" strokeWidth={1.8} />
+                    <strong className="mt-3 block text-lg text-akrus-900">Manual ainda não disponível</strong>
+                    <p className="mt-1 max-w-lg text-sm text-slate-500">
+                      Adicione o arquivo <strong>manual-orcamento.pdf</strong> na raiz do projeto para exibi-lo aqui.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       )}
 
       {showRepeatPrompt && (
@@ -605,7 +764,7 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
   );
 }
 
-function CompanyCard({ summary, onClick }) {
+function CompanyCard({ summary, periodLabel, onClick }) {
   return (
     <button
       className="app-panel grid gap-4 p-5 text-left transition hover:border-akrus/25 hover:bg-slate-50"
@@ -614,12 +773,40 @@ function CompanyCard({ summary, onClick }) {
     >
       <div>
         <span className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Empresa</span>
-        <strong className="mt-1 block text-xl text-akrus-900">{summary.company.name}</strong>
+        <strong className="mt-1 block text-xl text-akrus-900">
+          {summary.company.code} - {summary.company.name}
+        </strong>
         <span className="text-sm text-slate-500">{summary.company.systemName}</span>
       </div>
 
       <div className="border-t border-slate-200 pt-4">
-        <span className="block text-xs font-extrabold uppercase tracking-wide text-slate-400">Valor total lançado</span>
+        <span className="block text-xs font-extrabold uppercase tracking-wide text-slate-400">Orçado · {periodLabel}</span>
+        <strong className="text-lg text-akrus-900">{money.format(summary.value)}</strong>
+      </div>
+    </button>
+  );
+}
+
+function CompanyGroupCard({ summary, periodLabel, onClick }) {
+  return (
+    <button
+      className="app-panel grid gap-4 p-5 text-left transition hover:border-akrus/25 hover:bg-slate-50"
+      type="button"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <span className="text-xs font-extrabold uppercase tracking-wide text-slate-400">Grupo empresarial</span>
+          <strong className="mt-1 block text-xl text-akrus-900">{summary.group.name}</strong>
+          <span className="text-sm text-slate-500">{summary.companiesCount} empresa(s)</span>
+        </div>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-akrus-50 text-akrus">
+          <ChevronRight className="h-5 w-5" strokeWidth={2.4} />
+        </span>
+      </div>
+
+      <div className="border-t border-slate-200 pt-4">
+        <span className="block text-xs font-extrabold uppercase tracking-wide text-slate-400">Orçamento do grupo · {periodLabel}</span>
         <strong className="text-lg text-akrus-900">{money.format(summary.value)}</strong>
       </div>
     </button>
@@ -665,7 +852,9 @@ function SummaryLine({ label, value, danger }) {
   );
 }
 
-function BudgetCard({ budget, expanded, onToggle, onEditBudget }) {
+function BudgetCard({ budget, expanded, onToggle, onEditBudget, monthIndexes, periodLabel }) {
+  const [expandedAccountId, setExpandedAccountId] = useState(null);
+
   return (
     <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <button
@@ -688,7 +877,7 @@ function BudgetCard({ budget, expanded, onToggle, onEditBudget }) {
 
         <div className="flex items-end justify-between gap-3 md:block md:text-right">
           <span>
-            <span className="block text-xs font-extrabold uppercase tracking-wide text-slate-400">Valor</span>
+            <span className="block text-xs font-extrabold uppercase tracking-wide text-slate-400">Valor · {periodLabel}</span>
             <strong className="block text-base text-akrus-900">{money.format(budget.value)}</strong>
           </span>
           <span className="text-xl font-bold text-akrus">{expanded ? "−" : "+"}</span>
@@ -707,25 +896,70 @@ function BudgetCard({ budget, expanded, onToggle, onEditBudget }) {
                 </tr>
               </thead>
               <tbody>
-                {budget.items.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-200">
-                    <td className="px-3 py-3 font-bold text-akrus-900">
-                      {item.account.code} - {item.account.name}
-                    </td>
-                    <td className="px-3 py-3 text-right font-bold text-akrus-900">{money.format(item.value)}</td>
-                    <td className="px-3 py-3 text-right">
-                      <button
-                        className="inline-grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-akrus transition hover:border-akrus/25 hover:bg-slate-50"
-                        type="button"
-                        onClick={() => onEditBudget(item)}
-                        aria-label={`Editar orçamento da conta ${item.account.code}`}
-                        title="Editar orçamento"
+                {budget.items.map((item) => {
+                  const accountExpanded = expandedAccountId === item.id;
+
+                  return (
+                    <Fragment key={item.id}>
+                      <tr
+                        className="cursor-pointer border-t border-slate-200 transition hover:bg-slate-50"
+                        onClick={() => setExpandedAccountId((current) => (current === item.id ? null : item.id))}
+                        title="Clique para visualizar os valores mensais"
                       >
-                        <Pencil className="h-4 w-4" strokeWidth={2.2} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <td className="px-3 py-3 font-bold text-akrus-900">
+                          <span className="flex items-center gap-2">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-akrus-50 text-sm font-extrabold text-akrus">
+                              {accountExpanded ? "−" : "+"}
+                            </span>
+                            {item.account.code} - {item.account.name}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right font-bold text-akrus-900">{money.format(item.periodValue)}</td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            className="inline-grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-akrus transition hover:border-akrus/25 hover:bg-slate-50"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onEditBudget(item);
+                            }}
+                            aria-label={`Editar orçamento da conta ${item.account.code}`}
+                            title="Editar orçamento"
+                          >
+                            <Pencil className="h-4 w-4" strokeWidth={2.2} />
+                          </button>
+                        </td>
+                      </tr>
+
+                      {accountExpanded && (
+                        <tr className="border-t border-slate-200 bg-slate-50">
+                          <td colSpan="3" className="p-3">
+                            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                              <table className="min-w-[920px] w-full border-collapse text-sm">
+                                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                                  <tr>
+                                    {monthIndexes.map((index) => (
+                                      <th key={months[index]} className="border-l border-slate-100 px-3 py-2.5 text-right first:border-l-0">{months[index]}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t border-slate-200">
+                                    {monthIndexes.map((index) => (
+                                      <td key={months[index]} className="border-l border-slate-100 px-3 py-3 text-right font-bold tabular-nums text-akrus-900 first:border-l-0">
+                                        {money.format(item.monthlyValues[index])}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

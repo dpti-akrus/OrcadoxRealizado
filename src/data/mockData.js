@@ -1,7 +1,15 @@
+export const initialCompanyGroups = [
+  { id: "bem", name: "BEM" },
+  { id: "davantti", name: "DAVANTTI" },
+  { id: "biofolium", name: "BIOFOLIUM" }
+];
+
 export const initialCompanies = [
-  { id: 1, name: "1-Bem", systemName: "Bem industrias de Sementes LTDA", active: true },
-  { id: 2, name: "61-Davantti", systemName: "Davantti Implementos LTDA", active: true },
-  { id: 3, name: "51-Biofolium", systemName: "Biofolium Fertilizantes LTDA", active: true }
+  { id: 1, code: "1", name: "Bem", systemName: "Bem industrias de Sementes LTDA", groupId: "bem", active: true },
+  { id: 2, code: "2", name: "Bem", systemName: "Bem industrias de Sementes - Filial 2", groupId: "bem", active: true },
+  { id: 3, code: "3", name: "Bem", systemName: "Bem industrias de Sementes - Filial 3", groupId: "bem", active: true },
+  { id: 61, code: "61", name: "Davantti", systemName: "Davantti Implementos LTDA", groupId: "davantti", active: true },
+  { id: 51, code: "51", name: "Biofolium", systemName: "Biofolium Fertilizantes LTDA", groupId: "biofolium", active: true }
 ];
 
 export const initialCostCenters = [
@@ -55,3 +63,16 @@ export const systemUsers = [
 ];
 
 export const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+export const initialErpRealizedEntries = [
+  { id: 1, companyId: 1, costCenterId: 101, accountId: 201, monthlyValues: [9800, 9800, 10200, 10200, 10500, 10500, 10800, 10800, 11000, 11000, 11200, 11200] },
+  { id: 2, companyId: 1, costCenterId: 101, accountId: 203, monthlyValues: [4200, 3980, 4050, 4320, 4490, 4610, 4780, 4720, 4890, 5010, 5150, 5230] },
+  { id: 3, companyId: 1, costCenterId: 102, accountId: 202, monthlyValues: [6300, 2800, 4100, 7200, 3600, 5400, 8100, 3900, 4600, 6800, 5200, 7500] },
+  { id: 4, companyId: 2, costCenterId: 101, accountId: 201, monthlyValues: [7600, 7600, 7800, 7800, 7950, 7950, 8100, 8100, 8250, 8250, 8400, 8400] },
+  { id: 5, companyId: 2, costCenterId: 103, accountId: 203, monthlyValues: [3150, 3220, 3480, 3510, 3680, 3720, 3890, 4010, 3950, 4120, 4250, 4380] },
+  { id: 6, companyId: 3, costCenterId: 102, accountId: 201, monthlyValues: [6800, 6800, 6950, 6950, 7100, 7100, 7250, 7250, 7400, 7400, 7550, 7550] },
+  { id: 7, companyId: 61, costCenterId: 101, accountId: 202, monthlyValues: [5100, 3400, 4700, 3900, 6200, 4100, 5300, 4500, 6800, 4900, 5700, 7200] },
+  { id: 8, companyId: 61, costCenterId: 103, accountId: 203, monthlyValues: [2800, 2910, 3040, 3180, 3270, 3390, 3450, 3580, 3660, 3790, 3870, 3990] },
+  { id: 9, companyId: 51, costCenterId: 101, accountId: 201, monthlyValues: [8900, 8900, 9100, 9100, 9300, 9300, 9500, 9500, 9700, 9700, 9900, 9900] },
+  { id: 10, companyId: 51, costCenterId: 102, accountId: 203, monthlyValues: [3600, 3720, 3810, 3950, 4020, 4160, 4290, 4380, 4470, 4590, 4680, 4820] }
+];

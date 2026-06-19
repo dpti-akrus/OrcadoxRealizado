@@ -32,7 +32,6 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState("lancamento");
   const [pageVersion, setPageVersion] = useState(0);
   const [launchedBudgets, setLaunchedBudgets] = useState([]);
-  const [realizedEntries, setRealizedEntries] = useState([]);
   const currentUser = initialUsers[0];
   const safeCurrentPage = canAccessPage(currentPage, currentUser) ? currentPage : "lancamento";
   const Page = pages[safeCurrentPage];
@@ -59,8 +58,6 @@ export default function App() {
           key={`${safeCurrentPage}-${pageVersion}`}
           launchedBudgets={launchedBudgets}
           setLaunchedBudgets={setLaunchedBudgets}
-          realizedEntries={realizedEntries}
-          setRealizedEntries={setRealizedEntries}
         />
       </section>
     </main>
