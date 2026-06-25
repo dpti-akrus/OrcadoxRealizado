@@ -1,3 +1,5 @@
+// LEGADO: o fluxo principal do App usa OrcamentoAnualPage.jsx.
+// Este arquivo ainda contém mockData e não deve ser usado no lançamento real.
 import { Fragment, useMemo, useState } from "react";
 import { CheckCircle2, ChevronRight, HelpCircle, Pencil } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -345,7 +347,7 @@ export default function LancamentoOrcamentarioPage({ launchedBudgets, setLaunche
       return;
     }
 
-    setLaunchedBudgets((current) => current.filter((budget) => budget.id !== budgetToDelete.id));
+    // Legado sem uso no fluxo principal: não remover estado local como se fosse exclusão real.
     if (editingBudget?.id === budgetToDelete.id) {
       setEditingBudget(null);
       setIsFormOpen(false);

@@ -1,33 +1,5 @@
-import { TABELAS } from "../constants/database.js";
-import { criarPeriodoMensal } from "../helpers/dateHelpers.js";
-import { buscarDados } from "./sankhya/nativeSqlService.js";
-import { criarFiltros } from "./serviceHelpers.js";
+﻿// Reset controlado: consulta de realizado sem integracao real nesta etapa.
+const emptyResult = Object.freeze({ dados: [], total: 0 });
 
-export async function buscarRealizado({
-  exercicio,
-  mesInicial = 1,
-  mesFinal = 12,
-  codigoEmpresa,
-  codigoCentroResultado,
-  codigoConta
-}) {
-  const periodo = criarPeriodoMensal(Number(exercicio), Number(mesInicial), Number(mesFinal));
-
-  return buscarDados({
-    tabela: TABELAS.META_CONTABIL,
-    campos: ["CODEMP", "CODCENCUS", "CODCTACTB", "DTREF", "PREVISTO", "REALIZADO", "RECDESP"],
-    filtros: criarFiltros({
-      CODEMP: codigoEmpresa,
-      CODCENCUS: codigoCentroResultado,
-      CODCTACTB: codigoConta
-    }),
-    periodo: { campo: "DTREF", ...periodo },
-    ordenacao: [
-      { campo: "CODEMP", direcao: "asc" },
-      { campo: "CODCENCUS", direcao: "asc" },
-      { campo: "CODCTACTB", direcao: "asc" },
-      { campo: "DTREF", direcao: "asc" }
-    ]
-  });
-}
-
+export async function buscarRealizado() { return emptyResult; }
+export async function buscarRealizadoPorPeriodo() { return emptyResult; }

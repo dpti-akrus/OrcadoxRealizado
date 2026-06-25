@@ -1,12 +1,12 @@
-import { Building2, Calculator, ClipboardCheck, Landmark, Network, Users } from "lucide-react";
+import { Building2, Calculator, History, Landmark, Network, Users } from "lucide-react";
 
 const menuItems = [
   { id: "lancamento", label: "Orçamento", icon: Calculator },
-  { id: "realizado", label: "Realizado", icon: ClipboardCheck },
   { id: "empresas", label: "Empresas", icon: Building2, restricted: true },
   { id: "centros", label: "Centro de resultado", icon: Network, restricted: true },
   { id: "contas", label: "Contas Contábeis", icon: Landmark, restricted: true },
-  { id: "usuarios", label: "Usuários", icon: Users, restricted: true }
+  { id: "usuarios", label: "Usuários", icon: Users, restricted: true },
+  { id: "historico", label: "Historico de Lancamentos", icon: History, restricted: true }
 ];
 
 export default function Sidebar({ currentPage, onChangePage, canViewRestrictedPages = false }) {

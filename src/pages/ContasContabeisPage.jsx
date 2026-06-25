@@ -1,21 +1,30 @@
-import EntityManager from "../components/EntityManager.jsx";
-import { initialAccounts, systemAccounts } from "../data/mockData.js";
+﻿import AdminCrudPage from "../components/AdminCrudPage.jsx";
+import {
+  inativarContaAdmin,
+  listarContasAdmin,
+  salvarContaAdmin
+} from "../services/adminCadastrosService.js";
 
 export default function ContasContabeisPage() {
   return (
-    <EntityManager
-      eyebrow="Cadastros"
-      title="Contas contábeis"
-      description="Defina quais contas podem receber lançamento orçamentário."
-      addLabel="+ Adicionar conta"
-      formTitle="Adicionar conta contábil"
-      formDescription="Busque a conta do sistema e defina o nome curto exibido na plataforma."
-      searchLabel="Buscar conta no sistema"
-      nameLabel="Nome na plataforma"
-      searchPlaceholder="Ex: 3.03.08 - Energia Elétrica"
-      namePlaceholder="Ex: Energia"
-      initialItems={initialAccounts}
-      suggestions={systemAccounts}
+    <AdminCrudPage
+      title="Contas contabeis"
+      description="Cadastro real das contas contabeis usadas no orcamento."
+      addLabel="Adicionar conta"
+      loadItems={listarContasAdmin}
+      saveItem={salvarContaAdmin}
+      inactiveItem={inativarContaAdmin}
+      searchKeys={["codigo", "nome"]}
+      emptyText="Nenhuma conta contabil cadastrada."
+      columns={[
+        { key: "codigo", label: "CODCTACTB", strong: true },
+        { key: "nome", label: "Descricao" },
+        { key: "ativo", label: "Status" }
+      ]}
+      fields={[
+        { name: "codigo", label: "CODCTACTB *", numeric: true, required: true },
+        { name: "nome", label: "Descricao *", required: true }
+      ]}
     />
   );
 }

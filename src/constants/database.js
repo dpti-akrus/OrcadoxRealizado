@@ -1,19 +1,4 @@
-export const TABELAS = Object.freeze({
-  EMPRESA: "TSIEMP",
-  CENTRO_RESULTADO: "TSICUS",
-  CONTA_CONTABIL: "TCBPLA",
-  USUARIO: "Usuario",
-  ORC_EMPRESA: "AD_ORCEMP",
-  ORC_CENTRO_RESULTADO: "AD_ORCCUS",
-  ORC_CONTA: "AD_ORCCTA",
-  ORC_USUARIO: "AD_ORCUSU",
-  ORC_USUARIO_CENTRO: "AD_ORCUSUCUS",
-  ORCAMENTO: "AD_ORCAMENTO",
-  ORCAMENTO_MES: "AD_ORCAMENTOMES",
-  REALIZADO_MANUAL: "AD_ORCREAL",
-  META_CONTABIL: "TCBMET"
-});
-
+﻿// Constantes de banco removidas do modulo de orcamento durante o reset controlado.
+// Recriar aqui somente quando a nova regra real for definida.
+export const TABELAS = Object.freeze({});
 export const STATUS_ATIVO = Object.freeze({ ativo: "S", inativo: "N" });
-
-export const STATUS_ORCAMENTO = Object.freeze(["RASCUNHO", "ABERTO", "APROVADO", "BLOQUEADO"]);
